@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 #include <list>
+#include <memory>
 #include <queue>
 #include <stack>
 #include <stdexcept>
@@ -16,9 +17,9 @@
 
 using namespace std;
 
-
+// -----------------------------
 // Common incident model / OOP
-
+// -----------------------------
 class CityEvent {
 protected:
     int id;
@@ -118,6 +119,22 @@ public:
     string categoryDescription() const override { return "Emergency incident"; }
 };
 
+// Factory function: creates the appropriate incident dynamically.
+// The returned unique_ptr makes ownership explicit and safe.
+inline unique_ptr<CityEvent> makeCityEvent(
+    const string& type, int id, const string& location,
+    int severity, int impact, int waitingTime) {
+    if (type == "Traffic")
+        return make_unique<TrafficEvent>(id, location, severity, impact, waitingTime);
+    if (type == "Waste")
+        return make_unique<WasteEvent>(id, location, severity, impact, waitingTime);
+    if (type == "Infrastructure")
+        return make_unique<InfrastructureEvent>(id, location, severity, impact, waitingTime);
+    if (type == "Emergency")
+        return make_unique<EmergencyEvent>(id, location, severity, impact, waitingTime);
+    throw invalid_argument("Unknown incident type: " + type);
+}
+
 // -----------------------------
 // Simple BST for ID indexing
 // -----------------------------
@@ -157,11 +174,11 @@ public:
     bool search(int key) const { return search(root, key); }
 };
 
-
+// -----------------------------
 // Incident engine
-
+// -----------------------------
 class IncidentEngine {
-    list<CityEvent*> records;                    // linked list
+    list<unique_ptr<CityEvent>> records;         // linked list owns dynamically allocated incidents
     queue<int> waitingQueue;                     // normal waiting order
     priority_queue<pair<double,int>> priorityQ;  // highest priority first
     unordered_map<int, CityEvent*> idIndex;      // hashing
@@ -169,20 +186,32 @@ class IncidentEngine {
     stack<string> history;                       // recent status history
 
 public:
-    ~IncidentEngine() {
-        for (auto* e : records) delete e;
+    // unique_ptr owns each dynamic incident and automatically deletes it.
+    // The compiler-generated destructor is therefore sufficient.
+    IncidentEngine() = default;
+    IncidentEngine(const IncidentEngine&) = delete;
+    IncidentEngine& operator=(const IncidentEngine&) = delete;
+
+    void addIncident(unique_ptr<CityEvent> event) {
+        if (!event) throw invalid_argument("Null incident object.");
+        const int id = event->getId();
+        if (idIndex.count(id)) throw invalid_argument("Incident ID already exists.");
+
+        event->updatePriority();
+        CityEvent* rawEvent = event.get();
+        // Store ownership before publishing non-owning indexes.
+        records.push_back(std::move(event));
+        waitingQueue.push(id);
+        priorityQ.push({rawEvent->getPriority(), id});
+        idIndex[id] = rawEvent;
+        idTree.insert(id);
+        history.push("Incident " + to_string(id) + " created (Reported)");
     }
 
+    // Backward-compatible overload for existing callers that use new.
+    // Ownership transfers to the engine immediately, even if validation fails.
     void addIncident(CityEvent* event) {
-        if (!event) throw invalid_argument("Null incident object.");
-        if (idIndex.count(event->getId())) throw invalid_argument("Incident ID already exists.");
-        event->updatePriority();
-        records.push_back(event);
-        waitingQueue.push(event->getId());
-        priorityQ.push({event->getPriority(), event->getId()});
-        idIndex[event->getId()] = event;
-        idTree.insert(event->getId());
-        history.push("Incident " + to_string(event->getId()) + " created (Reported)");
+        addIncident(unique_ptr<CityEvent>(event));
     }
 
     CityEvent* findById(int id) const {
@@ -212,7 +241,9 @@ public:
     size_t size() const { return records.size(); }
 
     vector<CityEvent*> sortedByPriority() const {
-        vector<CityEvent*> v(records.begin(), records.end());
+        vector<CityEvent*> v;
+        v.reserve(records.size());
+        for (const auto& event : records) v.push_back(event.get());
         // Insertion sort: complete ordered view for reporting.
         for (size_t i = 1; i < v.size(); ++i) {
             CityEvent* key = v[i];
@@ -240,7 +271,7 @@ public:
              << setw(9) << "Impact" << setw(9) << "Wait"
              << setw(11) << "Priority" << setw(14) << "Status" << '\n';
         cout << string(93, '-') << '\n';
-        for (auto* e : records) e->print();
+        for (const auto& e : records) e->print();
     }
 
     void printSorted() const {
@@ -273,7 +304,8 @@ public:
         ofstream out(filename);
         if (!out) throw runtime_error("Unable to open incident output file.");
         out << "ID,Type,Location,Severity,Impact,WaitingTime,Priority,Status\n";
-        for (auto* e : records) {
+        for (const auto& ownedEvent : records) {
+            const CityEvent* e = ownedEvent.get();
             out << e->getId() << ',' << e->getType() << ',' << e->getLocation() << ','
                 << e->getSeverity() << ',' << e->getImpact() << ',' << e->getWaitingTime() << ','
                 << fixed << setprecision(2) << e->getPriority() << ',' << e->getStatus() << '\n';
@@ -283,3 +315,6 @@ public:
 
 
 #endif // INCIDENT_HPP
+
+
+    
