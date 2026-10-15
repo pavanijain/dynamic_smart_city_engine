@@ -113,6 +113,9 @@ size_t countUnderMaintenance() const {
     }
     return count;
 }
+size_t countTotal() const {
+    return resources.size();
+}
 
     void print() const {
         cout << "\nResources:\n";
