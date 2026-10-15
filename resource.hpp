@@ -104,6 +104,15 @@ size_t countBusy() const {
 
     return count;
 }
+size_t countUnderMaintenance() const {
+    size_t count = 0;
+    for (const auto& r : resources) {
+        if (r.status == "Under Maintenance") {
+            count++;
+        }
+    }
+    return count;
+}
 
     void print() const {
         cout << "\nResources:\n";
