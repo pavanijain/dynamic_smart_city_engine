@@ -103,6 +103,12 @@ public:
         total += static_cast<int>(roads.size());
     return total / 2;
 }
+int countNeighbors(const string& location) const {
+    if (!hasLocation(location))
+        return 0;
+
+    return static_cast<int>(adj[index.at(location)].size());
+}
 
 
 
