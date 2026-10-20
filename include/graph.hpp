@@ -97,6 +97,14 @@ public:
 
     size_t size() const { return names.size(); }
     bool hasLocation(const string& name) const { return index.count(name) > 0; }
+    int countRoads() const {
+    int total = 0;
+    for (const auto& roads : adj)
+        total += static_cast<int>(roads.size());
+    return total / 2;
+}
+
+
 
     // Shortest distance between two locations, or -1 if no route exists.
     int shortestDistance(const string& source, const string& target) const {
