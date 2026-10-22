@@ -93,6 +93,17 @@ public:
         for (const auto& r : resources) if (r.status == "Available") ++c;
         return c;
     }
+size_t countBusy() const {
+    size_t count = 0;
+
+    for (const auto& r : resources) {
+        if (r.status == "Busy") {
+            count++;
+        }
+    }
+
+    return count;
+}
 
     void print() const {
         cout << "\nResources:\n";
