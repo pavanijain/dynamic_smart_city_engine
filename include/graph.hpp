@@ -34,6 +34,17 @@ public:
         if (distance < 0) throw invalid_argument("Road distance cannot be negative.");
         if (!index.count(a) || !index.count(b)) throw invalid_argument("Unknown graph location.");
         int u = index[a], v = index[b];
+        if (u == v) throw invalid_argument("Self-loop roads are not allowed.");
+        for (auto& [to, w] : adj[u]) {
+            if (to == v) {
+                if (distance < w) {
+                    w = distance;
+                    for (auto& [to2, w2] : adj[v])
+                        if (to2 == u) { w2 = distance; break; }
+                }
+                return;
+            }
+        }
         adj[u].push_back({v, distance});
         adj[v].push_back({u, distance});
     }
